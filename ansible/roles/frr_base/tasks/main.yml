@@ -1,0 +1,11 @@
+---
+# Note: `ip forwarding` / `ipv6 forwarding` are not written back to FRR's
+# running-config, so this task always reports `changed` even when nothing moved.
+# That is expected, not a bug - see spec section 10 (vtysh idempotency caveat).
+- name: Base FRR hygiene
+  ansible.netcommon.cli_config:
+    config: |
+      service integrated-vtysh-config
+      log syslog informational
+      ip forwarding
+      ipv6 forwarding

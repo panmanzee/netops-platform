@@ -1,0 +1,30 @@
+---
+# Pushes each router's full intended config (rendered by `netops render`).
+- name: Wait for the routers to accept SSH
+  hosts: frr
+  gather_facts: false
+  tasks:
+    - name: Port 22 open
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 22
+        timeout: 60
+      delegate_to: localhost
+
+- name: Deploy the intended configuration
+  hosts: frr
+  gather_facts: false
+  tasks:
+    - name: Base FRR hygiene
+      ansible.builtin.include_role:
+        name: frr_base
+
+    - name: Push the config generated from the source of truth
+      ansible.netcommon.cli_config:
+        config: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../build/configs/intended/' ~ inventory_hostname ~ '.conf') }}"
+      register: push
+
+    - name: Report
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} ({{ role }}, AS {{ asn }}): intended config applied"
+      when: push is not failed
