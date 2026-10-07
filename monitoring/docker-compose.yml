@@ -1,0 +1,36 @@
+# Prometheus scrapes `netops watch` (running on the host, port 9108); Grafana draws it.
+# Ports are bound to localhost by default. Set BIND=0.0.0.0 to look at it from another machine.
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus
+    ports:
+      - "${BIND:-127.0.0.1}:9190:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 256m
+
+  grafana:
+    image: grafana/grafana-oss:11.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?set GRAFANA_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/netops.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${BIND:-127.0.0.1}:3300:3000"
+    depends_on: [prometheus]
+    mem_limit: 256m
+
+volumes:
+  prom-data:
+  grafana-data:
