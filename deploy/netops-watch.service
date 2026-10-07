@@ -1,0 +1,16 @@
+# Example systemd unit: run the watcher as a service.
+# Copy to /etc/systemd/system/, adjust paths and user, then: systemctl enable --now netops-watch
+[Unit]
+Description=netops watcher (health, drift, alerts, Prometheus metrics)
+After=network-online.target docker.service
+
+[Service]
+User=pan
+WorkingDirectory=/home/pan/netops-platform
+EnvironmentFile=-/home/pan/netops-platform/.env
+ExecStart=/home/pan/netops-platform/.venv/bin/python -m netops watch --interval 15
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
