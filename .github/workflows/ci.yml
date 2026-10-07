@@ -1,0 +1,52 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: yamllint .
+      - name: unit tests (validation rules, config generation, drift, alerts)
+        run: python -m pytest -q
+      - name: source of truth is valid and renders
+        run: |
+          python -m netops validate
+          python -m netops render --out /tmp/build
+      - name: dashboard JSON is up to date
+        run: |
+          python monitoring/make_dashboard.py
+          git diff --exit-code monitoring/grafana/dashboards/netops.json
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install tools
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+          pip install "ansible-core>=2.17" ansible-pylibssh
+          ansible-galaxy collection install -r ansible/requirements.yml
+          bash -c "$(curl -sL https://get.containerlab.dev)"
+      - name: build image, deploy the virtual network, configure it
+        run: |
+          make image
+          make up
+          make deploy
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+      - name: end-to-end checks (health, backup, drift, alerting)
+        run: scripts/e2e.sh
+      - name: tear down
+        if: always()
+        run: make down
