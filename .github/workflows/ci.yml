@@ -49,4 +49,4 @@ jobs:
         run: scripts/e2e.sh
       - name: tear down
         if: always()
-        run: make down
+        run: make down || true

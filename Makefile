@@ -8,6 +8,7 @@ help:
 	@grep -E '^[a-z0-9-]+:' Makefile | cut -d: -f1 | tr '\n' ' '; echo
 
 key:            ## SSH key the routers trust (generated once, never committed)
+	@mkdir -p ansible/.ssh
 	@test -f ansible/.ssh/id_ed25519 || ssh-keygen -q -t ed25519 -N '' -f ansible/.ssh/id_ed25519 -C netops-lab
 
 image: key      ## build the router image
