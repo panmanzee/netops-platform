@@ -1,0 +1,16 @@
+# secrets and local state: never commit
+.env
+*.pem
+*id_rsa
+*id_ed25519
+!*.pub
+ansible/.ssh/
+.vault_pass
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+backups/
+clab-*/
+.clab*

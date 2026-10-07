@@ -1,0 +1,99 @@
+# Source of truth for the demo network. Everything else (Containerlab topology,
+# router configs, Ansible inventory, monitoring expectations) is generated from
+# this file by `netops render`. Edit here, never on a router.
+site: demo-isp
+image: frr-lab:local
+mgmt:
+  network: clab-mgmt
+  subnet: 172.30.30.0/24
+
+# Named policy objects referenced by the BGP neighbours below.
+prefix_lists:
+  CUST-A:
+    - permit 198.51.100.0/24
+  CUST-B:
+    - permit 203.0.113.0/24 le 25
+
+route_maps:
+  FROM-CUST-A-BACKUP:
+    match_prefix_list: CUST-A
+    set: [community 65100:100, local-preference 100]
+  FROM-CUST-A-PRIMARY:
+    match_prefix_list: CUST-A
+    set: [community 65100:100, local-preference 200]
+  FROM-CUST-B:
+    match_prefix_list: CUST-B
+    set: [community 65100:200]
+
+devices:
+  r1:
+    role: customer
+    asn: 65001
+    mgmt_ip: 172.30.30.11
+    loopback: 10.255.1.1/32
+    interfaces:
+      eth1: {ip: 10.2.10.0/31, peer: "r2:eth1"}
+      eth2: {ip: 10.2.11.0/31, peer: "r4:eth1"}
+    bgp:
+      originate: [198.51.100.0/24, 10.99.0.0/24]   # 10.99.0.0/24 is a mistake the ISP filters
+      neighbors:
+        - {via: eth1}
+        - {via: eth2}
+
+  r2:
+    role: isp-edge
+    asn: 65100
+    mgmt_ip: 172.30.30.12
+    loopback: 10.255.2.2/32
+    interfaces:
+      eth1: {ip: 10.2.10.1/31, peer: "r1:eth1"}
+      eth2: {ip: 10.2.12.0/31, peer: "r3:eth1"}
+    ospf: {interfaces: [lo, eth2]}
+    bgp:
+      neighbors:
+        - {via: eth1, route_map_in: FROM-CUST-A-BACKUP}
+        - {peer: r3}
+
+  r3:
+    role: isp-core
+    asn: 65100
+    mgmt_ip: 172.30.30.13
+    loopback: 10.255.3.3/32
+    interfaces:
+      eth1: {ip: 10.2.12.1/31, peer: "r2:eth2"}
+      eth2: {ip: 10.2.13.0/31, peer: "r4:eth2"}
+    ospf: {interfaces: [lo, eth1, eth2]}
+    bgp:
+      neighbors:                       # route reflector
+        - {peer: r2, rr_client: true}
+        - {peer: r4, rr_client: true}
+
+  r4:
+    role: isp-edge
+    asn: 65100
+    mgmt_ip: 172.30.30.14
+    loopback: 10.255.4.4/32
+    interfaces:
+      eth1: {ip: 10.2.11.1/31, peer: "r1:eth2"}
+      eth2: {ip: 10.2.13.1/31, peer: "r3:eth2"}
+      eth3: {ip: 10.2.14.0/31, peer: "r5:eth1"}
+    ospf: {interfaces: [lo, eth2]}
+    bgp:
+      aggregates:
+        - {prefix: 203.0.113.0/24, summary_only: true}
+      neighbors:
+        - {via: eth1, route_map_in: FROM-CUST-A-PRIMARY}
+        - {via: eth3, route_map_in: FROM-CUST-B}
+        - {peer: r3}
+
+  r5:
+    role: customer
+    asn: 65002
+    mgmt_ip: 172.30.30.15
+    loopback: 10.255.5.5/32
+    interfaces:
+      eth1: {ip: 10.2.14.1/31, peer: "r4:eth3"}
+    bgp:
+      originate: [203.0.113.0/25, 203.0.113.128/25]
+      neighbors:
+        - {via: eth1}

@@ -1,0 +1,6 @@
+pydantic>=2.6
+pyyaml>=6
+jinja2>=3.1
+paramiko>=3.4
+prometheus-client>=0.20
+requests>=2.31
